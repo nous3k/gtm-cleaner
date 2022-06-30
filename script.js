@@ -2,6 +2,8 @@ let form = document.querySelector('form');
 let fileInput = document.querySelector('#file');
 let uploadedFile;
 
+const consoleRegex = new RegExp(/\s+console\.log\(.*\);?/);
+
 // Listen for submit events
 form.addEventListener('submit', handleSubmit);
 
@@ -27,8 +29,11 @@ function parseFile(event) {
     window.obj = JSON.parse(JSON.stringify(json));
     json = removeUnusedTriggers(json);
     json = removeUnusedVariables(json);
+    json = removeConsoleLogsFromVariables(json);
+    json = removeConsoleLogsFromTags(json);
     window.updated = json;
     linkToUpdatedJson(json);
+    console.log('updated==>', json);
 }
 
 // Takes a JSON obj as a parameter and returns an array of unused trigger IDs
@@ -97,11 +102,60 @@ function getUsedVariablesInTags(obj){
     return completeListOfUsedVariables;
 }
 
+// The function removes all the collected unused variables from the object given as an argument
 function removeUnusedVariables(obj){
     let currentVariables = obj.containerVersion.variable;
     let allUsedVariables = removeDuplicates(getUsedVariablesInTags(obj).concat(getUsedVariablesInVariables(obj)));
     console.log(allUsedVariables);
     currentVariables = currentVariables.filter(item=>allUsedVariables.includes(item.name));
+    return obj;
+}
+
+// The function replaces all the console logs in the tags and return the updated tags
+function findConsoleLogsInTags(obj){
+    let htmlTags = obj.containerVersion.tag.filter(item=>item.type.includes('html'));
+    htmlTags.forEach(item=>item.parameter[0].value = item.parameter[0].value.replace(consoleRegex, ''));
+
+    return htmlTags;
+}
+
+function findConsoleLogsInVariables(obj){
+    let jsVariables = obj.containerVersion.variable.filter(item=>item.type === 'jsm');
+    jsVariables.forEach(item=>item.parameter[0].value = item.parameter[0].value.replace(consoleRegex, ''));
+
+    return jsVariables;
+}
+
+function removeConsoleLogsFromVariables(obj){
+    let currentVariables = obj.containerVersion.variable;
+    let updatedVariables = findConsoleLogsInVariables(obj);
+
+    currentVariables.forEach((item, index, array)=>{
+        console.log(findConsoleLogsInVariables(obj))
+        if(findConsoleLogsInVariables(obj).includes(item)){
+            array.splice(index, 1);
+        }
+    })
+
+    currentVariables = currentVariables.concat(updatedVariables);
+    obj.containerVersion.variable = currentVariables;
+    return obj;
+    
+}
+
+function removeConsoleLogsFromTags(obj){
+    let currentTags = obj.containerVersion.tag;
+    let updatedTags = findConsoleLogsInTags(obj);
+
+
+    currentTags.forEach((item, index, array)=>{
+        if(findConsoleLogsInTags(obj).includes(item)){
+            array.splice(index, 1);
+        }
+    })
+
+    currentTags = currentTags.concat(updatedTags);
+    obj.containerVersion.tag = currentTags;
     return obj;
 }
 
