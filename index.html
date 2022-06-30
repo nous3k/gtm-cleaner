@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GTM cleanup tool</title>
+    <link rel="stylesheet" href="style.css"></link>
+</head>
+
+<body>
+
+    <form id="upload">
+        <label for="file">Upload container JSON Export</label><br/>
+        <input type="file" id="file" accept=".json"><br/>
+    
+        <button>Upload</button><br/><br/>
+
+        <label for="unusedTriggersCheckbox">Remove unused triggers</label>
+        <input type = "checkbox" id="unusedTriggersCheckbox"><br/>
+
+        <label for="unusedTriggersCheckbox">Remove unused variables</label>
+        <input type = "checkbox" id="unusedVariablesCheckbox"><br/>
+
+        <label for="unusedTriggersCheckbox">Remove console logs</label>
+        <input type = "checkbox" id="unusedTriggersCheckbox"><br/>
+    </form>
+
+
+    <div class="pre-number"></div>
+    <div class="after-number"></div>
+
+
+    <script src="script.js"></script>
+</body>
+</html>
