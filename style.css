@@ -5,3 +5,8 @@ body{
 #upload{
     width: 50%;
 }
+
+.error-message{
+    display:none;
+    color: red;
+}
