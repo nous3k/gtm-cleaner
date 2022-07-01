@@ -29,7 +29,7 @@ function validateFile(file) {
     }
 
     else if (!checkJSON(file)) {
-        pushError('ERROR: The uploaded file is not a valid JSON.')
+        pushError('ERROR: The uploaded file is not a valid JSON.');
     }
 
     else {
@@ -62,7 +62,6 @@ function parseFile(event) {
     json = removeConsoleLogsFromTags(json);
     window.updated = json;
     linkToUpdatedJson(json);
-    console.log('updated==>', json);
 }
 
 // Takes a JSON obj as a parameter and returns an array of unused trigger IDs
@@ -127,7 +126,6 @@ function getUsedVariablesInTags(obj) {
     let usedVariablesInTags = allParameterValues.flatMap(item => item.match(/\{\{(.+?)\}\}/g)).filter(item => item);
     let completeListOfUsedVariables = [].concat.apply(usedVariablesInTags, allListUsedVariables).map(item => cleanVariableName(item));
 
-    console.log(`used variables: ${completeListOfUsedVariables}`)
     return completeListOfUsedVariables;
 }
 
@@ -135,7 +133,6 @@ function getUsedVariablesInTags(obj) {
 function removeUnusedVariables(obj) {
     let currentVariables = obj.containerVersion.variable;
     let allUsedVariables = removeDuplicates(getUsedVariablesInTags(obj).concat(getUsedVariablesInVariables(obj)));
-    console.log(allUsedVariables);
     currentVariables = currentVariables.filter(item => allUsedVariables.includes(item.name));
     return obj;
 }
@@ -160,7 +157,6 @@ function removeConsoleLogsFromVariables(obj) {
     let updatedVariables = findConsoleLogsInVariables(obj);
 
     currentVariables.forEach((item, index, array) => {
-        console.log(findConsoleLogsInVariables(obj))
         if (findConsoleLogsInVariables(obj).includes(item)) {
             array.splice(index, 1);
         }
