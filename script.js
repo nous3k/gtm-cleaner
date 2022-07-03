@@ -2,6 +2,11 @@ let form = document.querySelector('form');
 let fileInput = document.querySelector('#file');
 let uploadedFile;
 let errorMsg = document.querySelector('.error-message');
+let settings = {
+    'triggers': document.querySelector('#unusedTriggersCheckbox').checked,
+    'variables': document.querySelector('#unusedVariablesCheckbox').checked,
+    'consoleLogs': document.querySelector('#consoleLogsCheckbox').checked,
+}
 
 const consoleRegex = new RegExp(/\s+console\.log\(.*\);?/);
 
@@ -46,6 +51,9 @@ function pushError(message) {
     errorMsg.style.display = "block";
 }
 
+
+
+
 function hideErrorMsg(){
     errorMsg.style.display = "none"
 }
@@ -56,10 +64,18 @@ function parseFile(event) {
     let json = JSON.parse(str);
 
     window.obj = JSON.parse(JSON.stringify(json));
-    json = removeUnusedTriggers(json);
-    json = removeUnusedVariables(json);
-    json = removeConsoleLogsFromVariables(json);
-    json = removeConsoleLogsFromTags(json);
+
+    if(settings.triggers){
+        json = removeUnusedTriggers(json);
+    }
+    if(settings.variables){
+        json = removeUnusedVariables(json);
+    }
+    if(settings.consoleLogs){
+        json = removeConsoleLogsFromVariables(json);
+        json = removeConsoleLogsFromTags(json);
+    }
+
     window.updated = json;
     linkToUpdatedJson(json);
 }
