@@ -73,10 +73,10 @@ function getUnusedTriggerIds(obj) {
     let allTriggers = triggers.map((item) => item.triggerId);
     let allTriggerGroups = triggers.filter(item => item.type === 'TRIGGER_GROUP');
     let allTriggerGroupParameters = allTriggerGroups.map(item => item.parameter);
-    let allTriggerGroupLists = [].concat.apply([], allTriggerGroupParameters).map(item => item.list);
-    let allTriggersInTriggerGroups = [].concat.apply([], allTriggerGroupLists).map(item => item.value);
-    let usedTriggers = [].concat.apply([], tags.map((item) => item.firingTriggerId));
-    let usedTriggersMerged = [].concat.apply(usedTriggers, allTriggersInTriggerGroups);
+    let allTriggerGroupLists = flattenArray(allTriggerGroupParameters).map(item => item.list);
+    let allTriggersInTriggerGroups = flattenArray(allTriggerGroupLists).map(item => item.value);
+    let usedTriggers = flattenArray(tags.map((item) => item.firingTriggerId));
+    let usedTriggersMerged = usedTriggers.concat(allTriggersInTriggerGroups);
 
     return allTriggers.filter(x => !usedTriggersMerged.includes(x));
 }
@@ -93,9 +93,9 @@ function removeUnusedTriggers(obj) {
 }
 
 function getUsedVariablesInVariables(obj) {
-    let allVariables = [].concat.apply([], obj.containerVersion.variable);
+    let allVariables = flattenArray(obj.containerVersion.variable);
     let allVariableParameters = allVariables.map(item => item.parameter)
-    let allVariableParemeterValues = [].concat.apply([], allVariableParameters).filter(item => item).map(item => item.value);
+    let allVariableParemeterValues = flattenArray(allVariableParameters).filter(item => item).map(item => item.value);
     let allUsedVariablesInVariables = allVariableParemeterValues.filter(item => item).flatMap(item => item.match(/\{\{(.+?)\}\}/g)).filter(item => item);
 
     return allUsedVariablesInVariables.map(item => cleanVariableName(item));
@@ -117,15 +117,21 @@ function removeDuplicates(arr) {
     return ret_arr;
 }
 
+function flattenArray(arr) {
+    return arr.reduce(function (flat, toFlatten) {
+      return flat.concat(Array.isArray(toFlatten) ? flattenArray(toFlatten) : toFlatten);
+    }, []);
+  }
+
 // The function will collect all the used variables inside tags and its "list" parameters
 function getUsedVariablesInTags(obj) {
     let tags = obj.containerVersion.tag;
-    let tagParameters = [].concat.apply([], tags.map(item => item.parameter));
+    let tagParameters = flattenArray(tags.map(item => item.parameter));
     let allParameterValues = tagParameters.map(item => item.value).filter(item => item);
     let allListValues = tagParameters.filter(item => item.type === 'LIST').map(item => item.list);
-    let allListUsedVariables = [].concat.apply([], [].concat.apply([], allListValues).map(item => item.map)).flatMap(item => item.value.match(/\{\{(.+?)\}\}/g)).filter(item => item);
+    let allListUsedVariables = flattenArray(flattenArray(allListValues).map(item => item.map)).flatMap(item => item.value.match(/\{\{(.+?)\}\}/g)).filter(item => item);
     let usedVariablesInTags = allParameterValues.flatMap(item => item.match(/\{\{(.+?)\}\}/g)).filter(item => item);
-    let completeListOfUsedVariables = [].concat.apply(usedVariablesInTags, allListUsedVariables).map(item => cleanVariableName(item));
+    let completeListOfUsedVariables = usedVariablesInTags.concat(allListUsedVariables).map(item => cleanVariableName(item));
 
     console.log(`used variables: ${completeListOfUsedVariables}`)
     return completeListOfUsedVariables;
