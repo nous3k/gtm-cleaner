@@ -35,7 +35,7 @@ function GTMObject(obj){
         let allVariables = flattenArray(this.variables);
         let allVariableParameters = allVariables.map(item => item.parameter)
         let allVariableParemeterValues = flattenArray(allVariableParameters).filter(item => item).map(item => item.value);
-        let allUsedVariablesInVariables = allVariableParemeterValues.filter(item => item).flatMap(item => item.match(/\{\{(.+?)\}\}/g)).filter(item => item);
+        let allUsedVariablesInVariables = allVariableParemeterValues.filter(item => item).flatMap(item => item.match(variableRegex)).filter(item => item);
         return allUsedVariablesInVariables.map(item => cleanVariableName(item));
     }
 
@@ -43,8 +43,8 @@ function GTMObject(obj){
         let tagParameters = flattenArray(this.tags.map(item => item.parameter));
         let allParameterValues = tagParameters.map(item => item.value).filter(item => item);
         let allListValues = tagParameters.filter(item => item.type === 'LIST').map(item => item.list);
-        let allListUsedVariables = flattenArray(flattenArray(allListValues).map(item => item.map)).flatMap(item => item.value.match(/\{\{(.+?)\}\}/g)).filter(item => item);
-        let usedVariablesInTags = allParameterValues.flatMap(item => item.match(/\{\{(.+?)\}\}/g)).filter(item => item);
+        let allListUsedVariables = flattenArray(flattenArray(allListValues).map(item => item.map)).flatMap(item => item.value.match(variableRegex)).filter(item => item);
+        let usedVariablesInTags = allParameterValues.flatMap(item => item.match(variableRegex)).filter(item => item);
         let completeListOfUsedVariables = usedVariablesInTags.concat(allListUsedVariables).map(item => cleanVariableName(item));
         return completeListOfUsedVariables;
     }
