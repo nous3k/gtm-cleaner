@@ -8,6 +8,78 @@ let settings = {
     'consoleLogs': document.querySelector('#consoleLogsCheckbox')
 }
 
+function GTMObject(obj){
+    this.obj = obj;
+    this.variables = this.obj.containerVersion.variable;
+    this.triggers = this.obj.containerVersion.trigger;
+    this.tags = this.obj.containerVersion.tag;
+
+    this.getUnusedTriggerIds = function(){
+        let allTriggers = this.triggers.map((item) => item.triggerId);
+        let allTriggerGroups = this.triggers.filter(item => item.type === 'TRIGGER_GROUP');
+        let allTriggerGroupParameters = allTriggerGroups.map(item => item.parameter);
+        let allTriggerGroupLists = flattenArray(allTriggerGroupParameters).map(item => item.list);
+        let allTriggersInTriggerGroups = flattenArray(allTriggerGroupLists).map(item => item.value);
+        let usedTriggers = flattenArray(this.tags.map((item) => item.firingTriggerId));
+        let usedTriggersMerged = usedTriggers.concat(allTriggersInTriggerGroups);
+        return allTriggers.filter(x => !usedTriggersMerged.includes(x));
+    }
+
+
+    this.removeUnusedTriggers = function(){
+        let arrayOfIds = this.getUnusedTriggerIds(this.obj);
+        this.obj.containerVersion.trigger = this.triggers.filter(e => !arrayOfIds.includes(e.triggerId));
+    }
+
+    this.getUsedVariablesInVariables = function(){
+        let allVariables = flattenArray(this.variables);
+        let allVariableParameters = allVariables.map(item => item.parameter)
+        let allVariableParemeterValues = flattenArray(allVariableParameters).filter(item => item).map(item => item.value);
+        let allUsedVariablesInVariables = allVariableParemeterValues.filter(item => item).flatMap(item => item.match(/\{\{(.+?)\}\}/g)).filter(item => item);
+        return allUsedVariablesInVariables.map(item => cleanVariableName(item));
+    }
+
+    this.getUsedVariablesInTags = function(){
+        let tagParameters = flattenArray(this.tags.map(item => item.parameter));
+        let allParameterValues = tagParameters.map(item => item.value).filter(item => item);
+        let allListValues = tagParameters.filter(item => item.type === 'LIST').map(item => item.list);
+        let allListUsedVariables = flattenArray(flattenArray(allListValues).map(item => item.map)).flatMap(item => item.value.match(/\{\{(.+?)\}\}/g)).filter(item => item);
+        let usedVariablesInTags = allParameterValues.flatMap(item => item.match(/\{\{(.+?)\}\}/g)).filter(item => item);
+        let completeListOfUsedVariables = usedVariablesInTags.concat(allListUsedVariables).map(item => cleanVariableName(item));
+        return completeListOfUsedVariables;
+    }
+
+    this.removeUnusedVariables = function(){
+        let allUsedVariables = removeDuplicates(this.getUsedVariablesInTags(this.obj).concat(this.getUsedVariablesInVariables(this.obj)));
+        this.obj.containerVersion.variable = this.variables.filter(item => allUsedVariables.includes(item.name));
+    }
+
+    this.replaceConsoleLogsInTags = function(){
+        let htmlTags = this.tags.filter(item => item.type.includes('html'));
+        htmlTags.forEach(item => item.parameter[0].value = item.parameter[0].value.replace(consoleRegex, ''));
+        return htmlTags;
+    }
+
+    this.replaceConsoleLogsInVariables = function(){
+        let jsVariables = this.variables.filter(item => item.type === 'jsm');
+        jsVariables.forEach(item => item.parameter[0].value = item.parameter[0].value.replace(consoleRegex, ''));
+        return jsVariables;
+    }
+
+    this.removeConsoleLogsFromVariables = function(){
+        let updatedVariables = this.replaceConsoleLogsInVariables(this.obj);
+        let replacedVariables = this.variables.map(obj => updatedVariables.find(o => o.variableId === obj.variableId) || obj);
+        this.obj.containerVersion.variable = replacedVariables;
+    }
+
+    this.removeConsoleLogsFromTags = function(){
+        let updatedTags = this.replaceConsoleLogsInTags(this.obj);
+        let replacedTags = this.tags.map(obj => updatedTags.find(o => o.tagId === obj.tagId) || obj);
+        this.obj.containerVersion.tag = replacedTags;
+    }
+
+}
+
 const consoleRegex = new RegExp(/\s+console\.log\(.*\);?/);
 const variableRegex = new RegExp(/\{\{(.+?)\}\}/g);
 
@@ -59,59 +131,28 @@ function hideErrorMsg(){
 
 // Parse and change the initial object
 function parseFile(event) {
-    let str = event.target.result;
-    let json = JSON.parse(str);
+    let obj = JSON.parse(event.target.result);
+    let gtmObject = new GTMObject(obj);
+    console.log(gtmObject)
 
-    window.obj = JSON.parse(JSON.stringify(json));
+
+    window.obj = JSON.parse(JSON.stringify(gtmObject.obj));
 
     if(settings.triggers.checked){
-        json = removeUnusedTriggers(json);
+        gtmObject.removeUnusedTriggers();
     }
     if(settings.variables.checked){
-        json = removeUnusedVariables(json);
+        gtmObject.removeUnusedVariables();
     }
     if(settings.consoleLogs.checked){
-        json = removeConsoleLogsFromVariables(json);
-        json = removeConsoleLogsFromTags(json);
+        gtmObject.removeConsoleLogsFromVariables();
+        gtmObject.removeConsoleLogsFromTags();
     }
 
-    window.updated = json;
-    linkToUpdatedJson(json);
+    window.updated = gtmObject.obj;
+    linkToUpdatedJson(gtmObject.obj);
 }
 
-// Takes a JSON obj as a parameter and returns an array of unused trigger IDs
-function getUnusedTriggerIds(obj) {
-    let tags = obj.containerVersion.tag;
-    let triggers = obj.containerVersion.trigger;
-
-    let allTriggers = triggers.map((item) => item.triggerId);
-    let allTriggerGroups = triggers.filter(item => item.type === 'TRIGGER_GROUP');
-    let allTriggerGroupParameters = allTriggerGroups.map(item => item.parameter);
-    let allTriggerGroupLists = flattenArray(allTriggerGroupParameters).map(item => item.list);
-    let allTriggersInTriggerGroups = flattenArray(allTriggerGroupLists).map(item => item.value);
-    let usedTriggers = flattenArray(tags.map((item) => item.firingTriggerId));
-    let usedTriggersMerged = usedTriggers.concat(allTriggersInTriggerGroups);
-
-    return allTriggers.filter(x => !usedTriggersMerged.includes(x));
-}
-
-// Takes a JSON obj and an array of trigger IDs to remove and returns the object without these triggers
-function removeUnusedTriggers(obj) {
-    let arrayOfIds = getUnusedTriggerIds(obj);
-
-    obj.containerVersion.trigger = obj.containerVersion.trigger.filter(e => !arrayOfIds.includes(e.triggerId));
-
-    return obj;
-}
-
-function getUsedVariablesInVariables(obj) {
-    let allVariables = flattenArray(obj.containerVersion.variable);
-    let allVariableParameters = allVariables.map(item => item.parameter)
-    let allVariableParemeterValues = flattenArray(allVariableParameters).filter(item => item).map(item => item.value);
-    let allUsedVariablesInVariables = allVariableParemeterValues.filter(item => item).flatMap(item => item.match(/\{\{(.+?)\}\}/g)).filter(item => item);
-
-    return allUsedVariablesInVariables.map(item => cleanVariableName(item));
-}
 
 function cleanVariableName(name) {
     return name.replace('{{', '').replace('}}', '');
@@ -135,61 +176,6 @@ function flattenArray(arr) {
     }, []);
   }
 
-// The function will collect all the used variables inside tags and its "list" parameters
-function getUsedVariablesInTags(obj) {
-    let tags = obj.containerVersion.tag;
-    let tagParameters = flattenArray(tags.map(item => item.parameter));
-    let allParameterValues = tagParameters.map(item => item.value).filter(item => item);
-    let allListValues = tagParameters.filter(item => item.type === 'LIST').map(item => item.list);
-    let allListUsedVariables = flattenArray(flattenArray(allListValues).map(item => item.map)).flatMap(item => item.value.match(/\{\{(.+?)\}\}/g)).filter(item => item);
-    let usedVariablesInTags = allParameterValues.flatMap(item => item.match(/\{\{(.+?)\}\}/g)).filter(item => item);
-    let completeListOfUsedVariables = usedVariablesInTags.concat(allListUsedVariables).map(item => cleanVariableName(item));
-
-    return completeListOfUsedVariables;
-}
-
-// The function removes all the collected unused variables from the object given as an argument
-function removeUnusedVariables(obj) {
-    let allUsedVariables = removeDuplicates(getUsedVariablesInTags(obj).concat(getUsedVariablesInVariables(obj)));
-    obj.containerVersion.variable = obj.containerVersion.variable.filter(item => allUsedVariables.includes(item.name));
-    return obj;
-}
-
-
-// The function replaces all the console logs in the tags and return the updated tags
-function replaceConsoleLogsInTags(obj) {
-    let htmlTags = obj.containerVersion.tag.filter(item => item.type.includes('html'));
-    htmlTags.forEach(item => item.parameter[0].value = item.parameter[0].value.replace(consoleRegex, ''));
-
-    return htmlTags;
-}
-
-function replaceConsoleLogsInVariables(obj) {
-    let jsVariables = obj.containerVersion.variable.filter(item => item.type === 'jsm');
-    jsVariables.forEach(item => item.parameter[0].value = item.parameter[0].value.replace(consoleRegex, ''));
-    
-    return jsVariables;
-}
-
-function removeConsoleLogsFromVariables(obj) {
-    let currentVariables = obj.containerVersion.variable;
-    let updatedVariables = replaceConsoleLogsInVariables(obj);
-
-    let replacedVariables = currentVariables.map(obj => updatedVariables.find(o => o.variableId === obj.variableId) || obj);
-
-    obj.containerVersion.variable = replacedVariables;
-    return obj;
-}
-
-function removeConsoleLogsFromTags(obj) {
-    let currentTags = obj.containerVersion.tag;
-    let updatedTags = replaceConsoleLogsInTags(obj);
-
-    let replacedTags = currentTags.map(obj => updatedTags.find(o => o.tagId === obj.tagId) || obj);
-
-    obj.containerVersion.tag = replacedTags;
-    return obj;
-}
 
 // Creates a link to download the updated JSON file
 function linkToUpdatedJson(obj) {
