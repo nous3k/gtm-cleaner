@@ -2,11 +2,7 @@ let form = document.querySelector('form');
 let fileInput = document.querySelector('#file');
 let uploadedFile;
 let errorMsg = document.querySelector('.error-message');
-let settings = {
-    'triggers': document.querySelector('#unusedTriggersCheckbox'),
-    'variables': document.querySelector('#unusedVariablesCheckbox'),
-    'consoleLogs': document.querySelector('#consoleLogsCheckbox')
-}
+
 
 function GTMObject(obj){
     this.obj = obj;
@@ -20,8 +16,9 @@ function GTMObject(obj){
         let allTriggerGroupParameters = allTriggerGroups.map(item => item.parameter);
         let allTriggerGroupLists = flattenArray(allTriggerGroupParameters).map(item => item.list);
         let allTriggersInTriggerGroups = flattenArray(allTriggerGroupLists).map(item => item.value);
+        let usedBlockingTriggers = flattenArray(this.tags.map(item => item.blockingTriggerId)).filter(item=>item);
         let usedTriggers = flattenArray(this.tags.map((item) => item.firingTriggerId));
-        let usedTriggersMerged = usedTriggers.concat(allTriggersInTriggerGroups);
+        let usedTriggersMerged = usedTriggers.concat(allTriggersInTriggerGroups, usedBlockingTriggers);
         return allTriggers.filter(x => !usedTriggersMerged.includes(x));
     }
 
@@ -133,6 +130,12 @@ function hideErrorMsg(){
 function parseFile(event) {
     let obj = JSON.parse(event.target.result);
     let gtmObject = new GTMObject(obj);
+    let settings = {
+        'triggers': document.querySelector('#unusedTriggersCheckbox'),
+        'variables': document.querySelector('#unusedVariablesCheckbox'),
+        'consoleLogs': document.querySelector('#consoleLogsCheckbox')
+    }
+
     console.log(gtmObject)
 
 
